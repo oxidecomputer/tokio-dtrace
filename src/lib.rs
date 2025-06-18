@@ -401,6 +401,7 @@ pub fn check_casts() -> Result<(), InvalidCasts> {
 /// ```
 ///
 /// [`tokio_dtrace::register_hooks`]: crate::register_hooks
+#[cfg(tokio_unstable)]
 pub mod hooks {
     use super::*;
     use tokio::runtime::TaskMeta;
