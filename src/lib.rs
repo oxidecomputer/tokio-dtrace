@@ -1,5 +1,6 @@
 // Copyright 2025 Oxide Computer Company
 
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 #![doc = include_str!("../README.md")]
 //!
 //! ## Usage
@@ -222,7 +223,7 @@ pub enum RegistrationError {
     UnstableFeaturesRequired,
 
     /// `tokio-dtrace` hooks were not registered as the layout of Tokio's
-    /// [`task::Id`] type has changed. See [`check_casts`] for details`.
+    /// [`tokio::task::Id`] type has changed. See [`check_casts`] for details.
     #[error(transparent)]
     InvalidCasts(#[from] InvalidCasts),
 

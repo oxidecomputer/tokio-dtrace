@@ -18,3 +18,13 @@ features = ["rt", "rt-multi-thread", "time", "signal", "macros"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
+
+[package.metadata.docs.rs]
+all-features = true
+# enable tokio_unstable when building docs
+rustdoc-args = ["--cfg", "docsrs", "--cfg", "tokio_unstable"]
+# it's necessary to _also_ pass `--cfg tokio_unstable to rustc, so that the
+# Tokio dependency is also built with the cfg enabled when building docs.
+# otherwise, the build will fail, as we reference types from Tokio which only
+# exist with the unstable flag.
+rustc-args = ["--cfg", "tokio_unstable"]
