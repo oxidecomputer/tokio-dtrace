@@ -1,10 +1,10 @@
+#!/usr/sbin/dtrace -s
 /*
  * This script profiles the following:
  * - distribution of poll durations across all tasks
  * - distribution of total duration for which a task exists
  * - distribution of total duration for which a task was actively being polled
  */
-
 
 tokio$1:::task-spawn
 {
@@ -21,13 +21,13 @@ tokio$1:::task-poll-end
 /self->poll_start_ts/
 {
     duration = timestamp - self->poll_start_ts;
-    @durations["task poll duration"] = quantize(duration);
+    @durations["task poll duration", copyinstr(arg1), arg2, arg3] = quantize(duration);
     task_poll_times[arg0] += duration;
     self->poll_start_ts = 0;
 }
 
 tokio$1:::task-terminate
 {
-    @durations["task total lifetime"] = quantize(timestamp - task_spawn_times[arg0]);
-    @durations["task active time"] = quantize(task_poll_times[arg0]);
+    @durations["task total lifetime", copyinstr(arg1), arg2, arg3] = quantize(timestamp - task_spawn_times[arg0]);
+    @durations["task active time", copyinstr(arg1), arg2, arg3] = quantize(task_poll_times[arg0]);
 }

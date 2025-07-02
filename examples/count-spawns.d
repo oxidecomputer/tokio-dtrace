@@ -1,3 +1,4 @@
+#!/usr/sbin/dtrace -s
 /*
  * When a task is spawned, count the stack that spawned it.
  */
