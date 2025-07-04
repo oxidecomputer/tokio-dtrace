@@ -409,22 +409,22 @@ pub mod hooks {
 
     /// Hook function to be used in [`tokio::runtime::Builder::on_task_spawn`].
     pub fn on_task_spawn(meta: &TaskMeta<'_>) {
-        probes::task__spawn!(|| meta_to_id(meta));
+        probes::task__spawn!(|| unpack_meta(meta));
     }
 
     /// Hook function to be used in [`tokio::runtime::Builder::on_before_task_poll`].
     pub fn on_before_task_poll(meta: &TaskMeta<'_>) {
-        probes::task__poll__start!(|| meta_to_id(meta));
+        probes::task__poll__start!(|| unpack_meta(meta));
     }
 
     /// Hook function to be used in [`tokio::runtime::Builder::on_after_task_poll`].
     pub fn on_after_task_poll(meta: &TaskMeta<'_>) {
-        probes::task__poll__end!(|| meta_to_id(meta));
+        probes::task__poll__end!(|| unpack_meta(meta));
     }
 
     /// Hook function to be used in [`tokio::runtime::Builder::on_task_terminate`].
     pub fn on_task_terminate(meta: &TaskMeta<'_>) {
-        probes::task__terminate!(|| meta_to_id(meta));
+        probes::task__terminate!(|| unpack_meta(meta));
     }
 
     /// Hook function to be used in [`tokio::runtime::Builder::on_thread_start`].
@@ -448,7 +448,17 @@ pub mod hooks {
     }
 
     #[inline]
-    fn meta_to_id(meta: &TaskMeta<'_>) -> u64 {
+    fn unpack_meta(meta: &TaskMeta<'_>) -> (u64, String, u32, u32) {
+        let id = id_to_u64(meta.id());
+        let location = meta.spawned_at();
+        let file = location.file().to_string();
+        let line = location.line();
+        let col = location.column();
+        (id, file, line, col)
+    }
+
+    #[inline]
+    fn id_to_u64(id: tokio::task::Id) -> u64 {
         unsafe {
             // SAFETY: Based on training and experience, I know that a
             // `tokio::task::Id` is represented as a single `NonZeroU64`.
@@ -456,7 +466,7 @@ pub mod hooks {
                 id: tokio::task::Id,
                 int: NonZeroU64,
             }
-            TrustMeOnThis { id: meta.id() }.int.get()
+            TrustMeOnThis { id }.int.get()
         }
     }
 }
@@ -464,10 +474,10 @@ pub mod hooks {
 #[usdt::provider(provider = "tokio")]
 #[allow(non_snake_case)]
 mod probes {
-    fn task__spawn(task_id: u64) {}
-    fn task__poll__start(task_id: u64) {}
-    fn task__poll__end(task_id: u64) {}
-    fn task__terminate(task_id: u64) {}
+    fn task__spawn(task_id: u64, file: String, line: u32, col: u32) {}
+    fn task__poll__start(task_id: u64, file: String, line: u32, col: u32) {}
+    fn task__poll__end(task_id: u64, file: String, line: u32, col: u32) {}
+    fn task__terminate(task_id: u64, file: String, line: u32, col: u32) {}
 
     fn worker__thread__start() {}
     fn worker__thread__stop() {}
