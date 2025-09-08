@@ -1,0 +1,8 @@
+#!/usr/bin/bpftrace
+/*
+ * When a task is spawned, count the stack that spawned it.
+ */
+usdt:$1:tokio:task-spawn
+{
+    @tasks[ustack()] = count();
+}
