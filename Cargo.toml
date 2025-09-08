@@ -10,7 +10,7 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 thiserror = "2.0.12"
 tokio = { version = "1.46.1", features = ["rt"] }
-usdt = "0.5.0"
+usdt = "0.6.0"
 
 [dev-dependencies.tokio]
 version = "1.46.1"
