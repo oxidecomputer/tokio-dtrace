@@ -1,0 +1,19 @@
+#!/usr/bin/bpftrace
+
+usdt:$1:tokio:task-poll-start,
+usdt:$1:tokio:task-poll-end,
+usdt:$1:tokio:task-spawn,
+usdt:$1:tokio:task-terminate
+/pid == $2/
+{
+    printf("thread[%4d] %s(task=%d)\n", tid, probe, arg0);
+}
+
+usdt:$1:tokio:worker-thread-start,
+usdt:$1:tokio:worker-thread-park,
+usdt:$1:tokio:worker-thread-unpark,
+usdt:$1:tokio:worker-thread-stop
+/pid == $2/
+{
+    printf("thread[%4d] %s()\n", tid, probe);
+}
