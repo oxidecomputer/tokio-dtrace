@@ -6,6 +6,7 @@ description = "DTrace probes for Tokio"
 readme = "README.md"
 repository = "https://github.com/oxidecomputer/tokio-dtrace"
 license = "MIT OR Apache-2.0"
+rust-version = "1.85.0"
 
 [dependencies]
 thiserror = "2.0.12"
