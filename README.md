@@ -28,9 +28,9 @@ using Tokio's runtime hooks. Probes are provided for the following events:
   `tokio*:::task-terminate` probe will fire *before* the `task-poll-end`
   probe for that poll. Otherwise, if `task-terminate` does not fire, the task
   is still [pending].
-- **`tokio*:::task-poll-end`: Records when a task has terminated.**
+- **`tokio*:::task-terminate`: Records when a task has terminated.**
 
-  `arg0` is the  [task `Id`] of the task being polled.
+  `arg0` is the  [task `Id`] of the task that has terminated.
 - **`tokio*:::worker-thread-start`: Records when the runtime has started a new
   worker thread, but before it starts doing work.**
   
