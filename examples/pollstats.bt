@@ -1,0 +1,43 @@
+#!/usr/bin/bpftrace
+/*
+ * This script profiles the following:
+ * - distribution of poll durations across all tasks
+ * - distribution of total duration for which a task exists
+ * - distribution of total duration for which a task was actively being polled
+ */
+
+usdt:$1:tokio:task-spawn
+{
+    @task_poll_times[arg0] = (uint64)0;
+    @task_spawn_times[arg0] = nsecs();
+}
+
+usdt:$1:tokio:task-poll-start
+{
+    @poll_start_ts[tid] = nsecs();
+}
+
+usdt:$1:tokio:task-poll-end
+{
+    if (!has_key(@poll_start_ts, tid)) {
+        return;
+    }
+    $duration = nsecs() - @poll_start_ts[tid];
+    @durations["task poll duration", str(arg1), arg2, arg3] = hist($duration);
+    @task_poll_times[arg0] += $duration;
+    delete(@poll_start_ts, tid);
+}
+
+usdt:$1:tokio:task-terminate
+{
+    @durations["task total lifetime", str(arg1), arg2, arg3] = hist(nsecs() - @task_spawn_times[arg0]);
+    @durations["task active time", str(arg1), arg2, arg3] = hist(@task_poll_times[arg0]);
+    if (has_key(@task_poll_times, arg0))
+    {
+        delete(@task_poll_times, arg0);
+    }
+    if (has_key(@task_spawn_times, arg0))
+    {
+        delete(@task_spawn_times, arg0);
+    }
+}

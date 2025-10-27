@@ -106,7 +106,6 @@
 //! [unstable features]: https://docs.rs/tokio/latest/tokio/#unstable-features
 //! [`tokio::main`]: https://docs.rs/tokio/latest/tokio/attr.main.html
 //!
-use std::num::NonZeroU64;
 
 /// Registers `tokio-dtrace`s probe hooks with the provided
 /// [`tokio::runtime::Builder`].
@@ -193,7 +192,6 @@ pub fn register_hooks(
 ) -> Result<&mut tokio::runtime::Builder, RegistrationError> {
     #[cfg(tokio_unstable)]
     {
-        check_casts()?;
         usdt::register_probes()?;
         let builder = builder
             .on_thread_start(hooks::on_thread_start)
@@ -222,65 +220,9 @@ pub enum RegistrationError {
     #[error("tokio-dtrace requires `RUSTFLAGS=\"--cfg tokio_unstable\"`")]
     UnstableFeaturesRequired,
 
-    /// `tokio-dtrace` hooks were not registered as the layout of Tokio's
-    /// [`tokio::task::Id`] type has changed. See [`check_casts`] for details.
-    #[error(transparent)]
-    InvalidCasts(#[from] InvalidCasts),
-
     /// Probes could not be registered with DTrace.
     #[error(transparent)]
     DTrace(#[from] usdt::Error),
-}
-
-/// Errors returned by [`check_casts`].
-#[derive(Debug, thiserror::Error)]
-#[error(
-    "\
-tokio-dtrace: POTENTIALLY UNSOUND CAST DETECTED!\n \
-  size_of::<tokio::task::Id>() = {id_size}\n       \
-       size_of::<NonZeroU64>() = {nonzero_u64_size}\n \
- align_of::<tokio::task::Id>() = {id_align}\n      \
-      align_of::<NonZeroU64>() = {nonzero_u64_align}\n\
-"
-)]
-pub struct InvalidCasts {
-    id_size: usize,
-    nonzero_u64_size: usize,
-    id_align: usize,
-    nonzero_u64_align: usize,
-}
-
-/// Checks that unsafe casts performed by `tokio-dtrace` are valid.
-///
-/// `tokio-dtrace` relies on the ability to cast a [`tokio::task::Id`] to a
-/// [`u64`] in order to pass a task ID to DTrace probes as an integer. This
-/// function checks that the sizes and alignments of the types are compatible. If
-/// they are not, it returns an error, indicating that the casts are potentially
-/// unsound. This may occur if Tokio has changed the representation of the
-/// [`tokio::task::Id`] type, which is unlikely, but always possible.
-///
-/// If this function returns an error, `tokio-dtrace`'s runtime hooks should not
-/// be used. Registering hooks using the [`register_hooks`] function will call
-/// this function prior to registering the runtime hooks, and will fail to do so
-/// if casts are unsound.
-pub fn check_casts() -> Result<(), InvalidCasts> {
-    use std::mem::{align_of, size_of};
-
-    let id_size = size_of::<tokio::task::Id>();
-    let nonzero_u64_size = size_of::<NonZeroU64>();
-    let id_align = align_of::<tokio::task::Id>();
-    let nonzero_u64_align = align_of::<NonZeroU64>();
-
-    if id_size != nonzero_u64_size || id_align != nonzero_u64_align {
-        Err(InvalidCasts {
-            id_size,
-            nonzero_u64_size,
-            id_align,
-            nonzero_u64_align,
-        })
-    } else {
-        Ok(())
-    }
 }
 
 /// Tokio runtime hooks for DTrace probes.
@@ -404,7 +346,7 @@ pub fn check_casts() -> Result<(), InvalidCasts> {
 /// [`tokio_dtrace::register_hooks`]: crate::register_hooks
 #[cfg(tokio_unstable)]
 pub mod hooks {
-    use super::*;
+    use super::probes;
     use tokio::runtime::TaskMeta;
 
     /// Hook function to be used in [`tokio::runtime::Builder::on_task_spawn`].
@@ -459,14 +401,25 @@ pub mod hooks {
 
     #[inline]
     fn id_to_u64(id: tokio::task::Id) -> u64 {
+        // `tokio-dtrace` relies on the ability to cast a [`tokio::task::Id`] to a
+        // [`u64`] in order to pass a task ID to DTrace probes as an integer. This
+        // code checks that the sizes and alignments of the types are compatible. If
+        // they are not, it is a build error, indicating that the casts are potentially
+        // unsound. This may occur if Tokio has changed the representation of the
+        // [`tokio::task::Id`] type, which is unlikely, but always possible.
         unsafe {
-            // SAFETY: Based on training and experience, I know that a
-            // `tokio::task::Id` is represented as a single `NonZeroU64`.
-            union TrustMeOnThis {
-                id: tokio::task::Id,
-                int: NonZeroU64,
-            }
-            TrustMeOnThis { id }.int.get()
+            // SAFETY:
+            // * Size an alignment is guaranteed by asserts below, which
+            //   leaves the question of value validity.
+            // * Based on training and experience, I know that a
+            //   `tokio::task::Id` is represented as a single `NonZeroU64`.
+            // * However we use a u64 as that will be sound even if tokio
+            //   starts producing the zero value.
+            const {
+                assert!(size_of::<tokio::task::Id>() == size_of::<u64>());
+                assert!(align_of::<tokio::task::Id>() == align_of::<u64>());
+            };
+            std::mem::transmute::<_, u64>(id)
         }
     }
 }
@@ -483,12 +436,4 @@ mod probes {
     fn worker__thread__stop() {}
     fn worker__thread__park() {}
     fn worker__thread__unpark() {}
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn casts_are_valid() {
-        crate::check_casts().unwrap();
-    }
 }
